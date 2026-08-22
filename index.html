@@ -13,7 +13,7 @@ import time
 # Configuración de página
 st.set_page_config(page_title="COROS Pace 4 Analytics", layout="wide", page_icon="🏊")
 
-st.title("🏃🏊 COROS Pace 4 - Analizador de Atletismo & Natación")
+st.title("🏃🏊 COROS Pace 4 - Analizador de Atletismo & Natación Técnica")
 
 # -----------------------------------------------------------------------------
 # DICCIONARIOS Y PARSERS DE NATACIÓN Y DEPORTES FIT
@@ -67,7 +67,7 @@ def convert_to_madrid_time(dt):
 # -----------------------------------------------------------------------------
 
 def procesar_telemetria(df, es_natacion=False):
-    """Limpia, convierte unidades y calcula métricas según el deporte (Carrera vs Natación)."""
+    """Limpia, convierte unidades y calcula métricas según el deporte."""
     df = df.copy()
     
     # 1. Zona Horaria Madrid y Tiempo Relativo
@@ -91,14 +91,14 @@ def procesar_telemetria(df, es_natacion=False):
             
         df['Tiempo_Formato'] = df['Tiempo_Segundos'].apply(formato_tiempo)
 
-    # 2. Distancia acumulada continua (si existe)
+    # 2. Distancia acumulada continua
     if 'distance' in df.columns:
         if es_natacion:
             df['distancia_acum_m'] = df['distance']
         else:
             df['distancia_acum_km'] = df['distance'] / 1000.0
 
-    # 3. Cálculo de Velocidad y Ritmo (Diferenciando Natación min/100m vs Carrera min/km)
+    # 3. Velocidad y Ritmo (min/100m para natación, min/km para carrera)
     if 'speed' in df.columns:
         df['speed_kmh'] = df['speed'] * 3.6
         
@@ -118,22 +118,23 @@ def procesar_telemetria(df, es_natacion=False):
             
         df['Ritmo_Texto'] = df['ritmo_suavizado'].apply(decimal_a_ritmo_texto)
 
-    # 4. Frecuencia Cardíaca (Suavizada)
+    # 4. Frecuencia Cardíaca
     if 'heart_rate' in df.columns:
         df['heart_rate_raw'] = df['heart_rate']
         df['heart_rate'] = df['heart_rate'].rolling(window=5, min_periods=1).mean()
 
-    # 5. Relación Ritmo, FC y Factor de Eficiencia (EF Instantáneo)
+    # 5. Coste Cardíaco y Factor de Eficiencia Instantáneo
     if 'ritmo_suavizado' in df.columns and 'heart_rate' in df.columns:
         df['latidos_por_km'] = df['heart_rate'] * df['ritmo_suavizado']
         df['latidos_por_km_suavizado'] = df['latidos_por_km'].rolling(window=15, min_periods=1).mean()
+        
+        # EF Instantáneo = Velocidad (m/min) / FC
+        if 'speed' in df.columns:
+            vel_m_min = df['speed'] * 60
+            df['ef_instantaneo'] = np.where(df['heart_rate'] > 0, vel_m_min / df['heart_rate'], np.nan)
+            df['ef_suavizado'] = df['ef_instantaneo'].rolling(window=15, min_periods=1).mean()
 
-    if 'speed' in df.columns and 'heart_rate' in df.columns:
-        velocidad_m_min = df['speed'] * 60
-        df['ef_inst'] = np.where(df['heart_rate'] > 0, velocidad_m_min / df['heart_rate'], np.nan)
-        df['ef_suavizado'] = df['ef_inst'].rolling(window=15, min_periods=1).mean()
-
-    # 6. Coordenadas GPS (Solo si existen)
+    # 6. Coordenadas GPS
     if 'position_lat' in df.columns and 'position_long' in df.columns:
         df_valid_gps = df.dropna(subset=['position_lat', 'position_long'])
         if not df_valid_gps.empty:
@@ -150,7 +151,7 @@ def procesar_telemetria(df, es_natacion=False):
     return df
 
 def leer_fichero_fit(file_bytes, file_name):
-    """Extrae records, laps, lengths y metadatos con soporte completo para Natación."""
+    """Extrae records, laps, lengths y metadatos con métricas avanzadas de natación."""
     records = []
     laps = []
     lengths = []
@@ -166,7 +167,10 @@ def leer_fichero_fit(file_bytes, file_name):
         'temperatura_media': None,
         'swolf_medio': None,
         'largos_totales': 0,
-        'estilo_principal': 'Libre / Crawl'
+        'brazadas_totales': 0,
+        'longitud_piscina_m': 25.0,
+        'dps_medio': None,
+        'brazadas_por_largo_medio': None
     }
     
     with fitdecode.FitReader(file_bytes) as fit:
@@ -194,6 +198,10 @@ def leer_fichero_fit(file_bytes, file_name):
                             metadata['swolf_medio'] = field.value
                         elif field.name == 'num_lengths' and field.value:
                             metadata['largos_totales'] = field.value
+                        elif field.name == 'total_strokes' and field.value:
+                            metadata['brazadas_totales'] = field.value
+                        elif field.name == 'pool_length' and field.value:
+                            metadata['longitud_piscina_m'] = field.value
 
                 elif frame.name == 'lap':
                     lap_data = {}
@@ -225,14 +233,71 @@ def leer_fichero_fit(file_bytes, file_name):
     df_laps = pd.DataFrame(laps)
     df_lengths = pd.DataFrame(lengths)
     
-    if not metadata['es_natacion']:
+    # Procesar métricas adicionales de piscina si hay df_lengths
+    if metadata['es_natacion']:
+        if not df_lengths.empty and 'total_strokes' in df_lengths.columns:
+            stk_val = df_lengths['total_strokes'].dropna()
+            if not stk_val.empty:
+                metadata['brazadas_por_largo_medio'] = round(stk_val.mean(), 1)
+                pisc_len = metadata['longitud_piscina_m'] if metadata['longitud_piscina_m'] else 25.0
+                if metadata['brazadas_por_largo_medio'] > 0:
+                    metadata['dps_medio'] = round(pisc_len / metadata['brazadas_por_largo_medio'], 2)
+
+        # Cálculo de respaldo para DPS si no venían lengths
+        if metadata['dps_medio'] is None and metadata['brazadas_totales'] > 0 and metadata['distancia_total'] > 0:
+            metadata['dps_medio'] = round(metadata['distancia_total'] / metadata['brazadas_totales'], 2)
+            if metadata['largos_totales'] > 0:
+                metadata['brazadas_por_largo_medio'] = round(metadata['brazadas_totales'] / metadata['largos_totales'], 1)
+    else:
         metadata['distancia_total'] = metadata['distancia_total'] / 1000.0
 
     return df_records, df_laps, df_lengths, metadata
 
 # -----------------------------------------------------------------------------
-# CÁLCULOS FISIOLÓGICOS Y DIAGNÓSTICO
+# CÁLCULOS FISIOLÓGICOS, FATIGA Y DIAGNÓSTICO DE NATACIÓN
 # -----------------------------------------------------------------------------
+
+def calcular_fatiga_natacion(df_lengths, df_laps, meta):
+    """Calcula el Drop-off de ritmo, brazadas y SWOLF comparando el 1º cuartil vs 4º cuartil."""
+    res = {
+        'drop_off_brazadas_pct': 0.0,
+        'drop_off_ritmo_pct': 0.0,
+        'q1_brazadas': 0, 'q4_brazadas': 0,
+        'q1_ritmo': 0, 'q4_ritmo': 0,
+        'q1_swolf': 0, 'q4_swolf': 0,
+        'alerta_fatiga': False
+    }
+    
+    if not df_lengths.empty and 'total_strokes' in df_lengths.columns and 'total_timer_time' in df_lengths.columns:
+        df_act = df_lengths[df_lengths['length_type'] != 0].copy() if 'length_type' in df_lengths.columns else df_lengths.copy()
+        if len(df_act) >= 4:
+            n = len(df_act)
+            q_size = max(1, n // 4)
+            q1 = df_act.iloc[:q_size]
+            q4 = df_act.iloc[-q_size:]
+            
+            res['q1_brazadas'] = round(q1['total_strokes'].mean(), 1)
+            res['q4_brazadas'] = round(q4['total_strokes'].mean(), 1)
+            
+            if 'avg_speed' in q1.columns and 'avg_speed' in q4.columns:
+                q1_s = q1['avg_speed'].mean()
+                q4_s = q4['avg_speed'].mean()
+                res['q1_ritmo'] = round(1.66667 / q1_s, 2) if q1_s > 0.05 else 0
+                res['q4_ritmo'] = round(1.66667 / q4_s, 2) if q4_s > 0.05 else 0
+                
+            if 'avg_swolf' in q1.columns and 'avg_swolf' in q4.columns:
+                res['q1_swolf'] = round(q1['avg_swolf'].mean(), 1)
+                res['q4_swolf'] = round(q4['avg_swolf'].mean(), 1)
+                
+            if res['q1_brazadas'] > 0:
+                res['drop_off_brazadas_pct'] = round(((res['q4_brazadas'] - res['q1_brazadas']) / res['q1_brazadas']) * 100, 1)
+            if res['q1_ritmo'] > 0 and res['q4_ritmo'] > 0:
+                res['drop_off_ritmo_pct'] = round(((res['q4_ritmo'] - res['q1_ritmo']) / res['q1_ritmo']) * 100, 1)
+                
+            if res['drop_off_brazadas_pct'] >= 15.0:
+                res['alerta_fatiga'] = True
+
+    return res
 
 def calcular_factor_eficiencia(df, es_natacion=False):
     """Calcula el Efficiency Factor (EF) = Velocidad (m/min) / FC Promedio."""
@@ -284,22 +349,21 @@ def diagnosticar_comparativa(data1, data2):
     if swolf1 and swolf2:
         diff_swolf = swolf2 - swolf1
         if diff_swolf >= 2:
-            diagnosticos.append(f"🏊 **Empeoramiento de SWOLF (+{diff_swolf} ptos):** Necesitaste más tiempo o más brazadas por largo. Tu técnica fue menos eficaz.")
+            diagnosticos.append(f"🏊 **Empeoramiento de SWOLF (+{diff_swolf} ptos):** Necesitaste más tiempo o más brazadas por largo. Pérdida de agarre técnico.")
         elif diff_swolf <= -2:
             diagnosticos.append(f"🏊 **Mejora de SWOLF ({diff_swolf} ptos):** ¡Excelente técnica! Has nadado más deslizante reduciendo tiempo/brazadas.")
 
-    temp1 = meta1.get('temperatura_media') or (df1['temperature'].mean() if 'temperature' in df1.columns else None)
-    temp2 = meta2.get('temperatura_media') or (df2['temperature'].mean() if 'temperature' in df2.columns else None)
-    if temp1 is not None and temp2 is not None:
-        diff_temp = temp2 - temp1
-        if abs(diff_temp) >= 2.5:
-            diagnosticos.append(f"🌡️ **Diferencia Térmica ({diff_temp:+.1f}°C):** Cambios de temperatura afectan al gasto cardíaco.")
+    dps1, dps2 = meta1.get('dps_medio'), meta2.get('dps_medio')
+    if dps1 and dps2:
+        diff_dps = dps2 - dps1
+        if diff_dps <= -0.15:
+            diagnosticos.append(f"🏊‍♂️ **Caída de Distancia por Brazada (DPS):** Pasaste de {dps1}m a {dps2}m por brazada ({diff_dps:+.2f}m). Reducción del avance por zancada acuática.")
 
     if drift2 is not None and drift2 > 5.0:
         diagnosticos.append(f"🔥 **Desacople Aeróbico Elevado ({drift2}%):** En la 2ª mitad del entrenamiento tu pulso subió en relación al ritmo.")
 
     if not diagnosticos:
-        diagnosticos.append("💤 **Fatiga Acumulada:** Condiciones similares, la variación en el rendimiento suele responder a la carga de fatiga previa o descanso.")
+        diagnosticos.append("💤 **Fatiga Acumulada:** Condiciones similares, la variación responde a carga previa o descanso.")
 
     return diagnosticos, ef1, ef2, drift1, drift2
 
@@ -312,7 +376,7 @@ def consultar_gemini_coach(prompt_texto):
         "contents": [{"parts": [{"text": prompt_texto}]}],
         "systemInstruction": {
             "parts": [{
-                "text": "Eres un entrenador de atletismo y natación de alto rendimiento experto en métricas de COROS y Garmin. Responde con rigor científico y tono motivador."
+                "text": "Eres un entrenador de atletismo y natación de alto rendimiento experto en biomecánica, DPS, SWOLF y fisiología de COROS. Responde con rigor técnico y tono motivador."
             }]
         }
     }
@@ -366,15 +430,11 @@ if uploaded_files:
             lengths = sel['lengths']
             es_nat = meta['es_natacion']
 
-            # Cálculo de Eficiencia para la sesión individual
             ef_valor, drift_valor = calcular_factor_eficiencia(df, es_natacion=es_nat)
 
-            # Indicador de Deporte
-            if es_nat:
-                st.info("🏊 **Actividad de Natación Detectada:** Las métricas y gráficos se han adaptado automáticamente a **min/100m**, **SWOLF** y **brazadas**.")
-            
-            # Métricas Clave
             st.markdown(f"### 📍 {meta['deporte']} - {meta['fecha_inicio'].strftime('%d de %B, %Y a las %H:%M') if meta['fecha_inicio'] else ''}")
+            
+            # Tarjetas de Métricas Principales
             col1, col2, col3, col4, col5, col6 = st.columns(6)
             
             if es_nat:
@@ -390,10 +450,31 @@ if uploaded_files:
             
             if es_nat:
                 col5.metric("SWOLF Medio", f"{meta['swolf_medio']}" if meta['swolf_medio'] else "N/A")
-                col6.metric("Largos Totales", f"{meta['largos_totales']}" if meta['largos_totales'] else "N/A")
+                col6.metric("DPS Medio", f"{meta['dps_medio']} m/br" if meta['dps_medio'] else "N/A", help="Distance Per Stroke (Metros avanzados por cada brazada)")
             else:
                 col5.metric("Calorías", f"{int(meta['calorias_totales'])} kcal")
                 col6.metric("Temperatura", f"{meta['temperatura_media']} °C" if meta['temperatura_media'] is not None else "N/A")
+
+            # PANEL ESPECIAL DE NATACIÓN TÉCNICA (Si es piscina)
+            if es_nat:
+                st.markdown("---")
+                st.subheader("🏊‍♂️ Resumen Técnico y Análisis de Fatiga (Natación)")
+                fatiga = calcular_fatiga_natacion(lengths, laps, meta)
+                
+                c_sw1, c_sw2, c_sw3, c_sw4 = st.columns(4)
+                c_sw1.metric("Brazadas / Largo", f"{meta['brazadas_por_largo_medio']} br" if meta['brazadas_por_largo_medio'] else "N/A")
+                c_sw2.metric("Drop-off Brazadas", f"{fatiga['drop_off_brazadas_pct']:+.1f}%", help="Variación de brazadas por largo entre el 1º y último 25% del entreno")
+                c_sw3.metric("Drop-off Ritmo", f"{fatiga['drop_off_ritmo_pct']:+.1f}%", help="Variación de ritmo entre inicio y final")
+                
+                # Coste cardiovascular en natación (Latidos por 100m)
+                ritmo_med_100 = (meta['duracion_total'] / (meta['distancia_total'] / 100.0)) / 60.0 if meta['distancia_total'] > 0 else 0
+                latidos_100m = int(meta['fc_media'] * ritmo_med_100) if meta['fc_media'] and ritmo_med_100 > 0 else "N/A"
+                c_sw4.metric("Coste Cardiovascular", f"{latidos_100m} lat/100m" if latidos_100m != "N/A" else "N/A", help="Latidos consumidos para completar 100m")
+
+                if fatiga['alerta_fatiga']:
+                    st.error(f"⚠️ **Alerta de Fatiga Técnica:** Tuviste un aumento del **{fatiga['drop_off_brazadas_pct']}% en brazadas por largo** en el último tramo ({fatiga['q1_brazadas']} br/largo inicial vs {fatiga['q4_brazadas']} br/largo final). Hubo pérdida de agarre y deslizamiento.")
+                elif fatiga['q1_brazadas'] > 0:
+                    st.success("✅ **Excelente Consistencia Técnica:** Mantuviste tu número de brazadas y distancia por brazada (DPS) uniforme de principio a fin.")
 
             # Marcadores de Vueltas (Laps)
             vueltas_tiempos = []
@@ -444,7 +525,17 @@ if uploaded_files:
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-            # RELACIÓN RITMO - FRECUENCIA CARDÍACA (Coste Cardíaco & Dispersión)
+            # EVOLUCIÓN SWOLF POR LARGO / INTERVALO (Para natación)
+            if es_nat and not lengths.empty and 'avg_swolf' in lengths.columns:
+                st.subheader("🏊 Evolution de SWOLF por Largo")
+                df_len_act = lengths[lengths['length_type'] != 0].copy() if 'length_type' in lengths.columns else lengths.copy()
+                if not df_len_act.empty:
+                    df_len_act['Largo_Num'] = range(1, len(df_len_act) + 1)
+                    fig_sw = px.line(df_len_act, x='Largo_Num', y='avg_swolf', markers=True, color_discrete_sequence=['#FF6600'])
+                    fig_sw.update_layout(xaxis_title="Número de Largo", yaxis_title="SWOLF (Tiempo + Brazadas)")
+                    st.plotly_chart(fig_sw, use_container_width=True)
+
+            # RELACIÓN RITMO - FRECUENCIA CARDÍACA (En Carrera)
             if not es_nat and 'latidos_por_km_suavizado' in df.columns:
                 st.markdown("---")
                 st.subheader("❤️⚡ Relación Ritmo / Frecuencia Cardíaca (Eficiencia en Carrera)")
@@ -504,7 +595,7 @@ if uploaded_files:
             # Tabla de Vueltas / Desglose por Km o Largos
             if not laps.empty:
                 st.subheader("⏱️ Desglose por Vueltas / Intervalos")
-                cols_mostrar = [c for c in ['lap_index', 'total_elapsed_time', 'total_distance', 'avg_speed', 'avg_heart_rate', 'avg_swolf'] if c in laps.columns]
+                cols_mostrar = [c for c in ['lap_index', 'total_elapsed_time', 'total_distance', 'avg_speed', 'avg_heart_rate', 'avg_swolf', 'total_strokes'] if c in laps.columns]
                 df_laps_show = laps[cols_mostrar].copy()
                 
                 if 'total_distance' in df_laps_show.columns:
@@ -525,25 +616,18 @@ if uploaded_files:
                 st.dataframe(df_laps_show, use_container_width=True)
 
         # =====================================================================
-        # PESTAÑA 2: COMPARATIVA MULTI-SESIÓN CON ALINEACIÓN MANUAL
+        # PESTAÑA 2: COMPARATIVA MULTI-SESIÓN CON ALINEACIÓN MANUAL Y METRICAS COMPLETAS
         # =====================================================================
         with tab_comp:
             st.subheader("🔀 Superposición y Alineación Manual de Entrenamientos")
             if len(datos_cargados) < 2:
                 st.info("Sube 2 o más archivos .FIT para poder compararlos en la misma gráfica.")
             else:
-                # Selector de métrica y eje X (Con la nueva opción de Factor de Eficiencia)
                 col_m, col_e = st.columns(2)
                 with col_m:
                     metrica_comp = st.radio(
                         "Métrica a visualizar:",
-                        [
-                            "Frecuencia Cardíaca (ppm)", 
-                            "Ritmo", 
-                            "Cadencia", 
-                            "Coste Cardíaco (Latidos/km)", 
-                            "Factor de Eficiencia (EF)"
-                        ],
+                        ["Frecuencia Cardíaca (ppm)", "Ritmo", "Cadencia", "Coste Cardíaco (Latidos/km)", "Factor de Eficiencia (EF)"],
                         horizontal=True
                     )
                 with col_e:
@@ -556,7 +640,6 @@ if uploaded_files:
                 st.markdown("#### 🎚️ Ajuste Manual de Alineación (Offset / Desfase)")
                 st.caption("Usa los controles deslizantes para mover horizontalmente cada sesión y alinear las series de intervalos o calentamientos.")
 
-                # Generar sliders de desfase por cada archivo
                 offsets = {}
                 cols_offsets = st.columns(min(len(datos_cargados), 4))
                 for i, d in enumerate(datos_cargados):
@@ -573,7 +656,6 @@ if uploaded_files:
                             key=f"slider_off_{i}"
                         )
 
-                # Construir Gráfica Comparativa con Desfase
                 fig_comp = go.Figure()
                 autorange_rev = False
 
@@ -585,7 +667,6 @@ if uploaded_files:
                     nom_act = d['meta']['fecha_inicio'].strftime('%d/%m %H:%M') if d['meta']['fecha_inicio'] else d['meta']['nombre_archivo']
                     off_sec = offsets[i]
 
-                    # Preparar Eje X (Tiempo con desfase o Distancia)
                     if eje_x_tipo == "Tiempo de Actividad":
                         x_vals = df_c['Tiempo_Segundos'] + off_sec
                         x_title = "Tiempo (segundos con desfase manual)"
@@ -608,7 +689,6 @@ if uploaded_files:
                             x_title = "Tiempo"
                         x_hover = x_vals.round(2).astype(str)
 
-                    # Selector de Y_vals
                     y_vals = None
                     y_title = metrica_comp
 
@@ -623,7 +703,6 @@ if uploaded_files:
                         y_title = "Brazadas/min" if d['meta']['es_natacion'] else "Pasos/min"
                     elif metrica_comp == "Coste Cardíaco (Latidos/km)" and 'latidos_por_km_suavizado' in df_c.columns:
                         y_vals = df_c['latidos_por_km_suavizado']
-                        y_title = "Latidos / km"
                     elif metrica_comp == "Factor de Eficiencia (EF)" and 'ef_suavizado' in df_c.columns:
                         y_vals = df_c['ef_suavizado']
                         y_title = "EF (m/min por latido)"
@@ -701,7 +780,7 @@ if uploaded_files:
                         - Distancia: {data1['meta']['distancia_total']}
                         - FC Media: {data1['meta']['fc_media']} ppm
                         - Factor de Eficiencia (EF): {ef1}
-                        - Deriva Cardíaca: {drift1}%
+                        - DPS Medio: {data1['meta'].get('dps_medio')} m/br
                         - SWOLF: {data1['meta'].get('swolf_medio')}
                         
                         SESIÓN 2 (A analizar):
@@ -710,13 +789,13 @@ if uploaded_files:
                         - Distancia: {data2['meta']['distancia_total']}
                         - FC Media: {data2['meta']['fc_media']} ppm
                         - Factor de Eficiencia (EF): {ef2}
-                        - Deriva Cardíaca: {drift2}%
+                        - DPS Medio: {data2['meta'].get('dps_medio')} m/br
                         - SWOLF: {data2['meta'].get('swolf_medio')}
                         
                         Diagnósticos automáticos:
                         {json.dumps(diagnosticos, ensure_ascii=False)}
                         
-                        Resume qué ha ocurrido a nivel de rendimiento, técnica o respuesta cardíaca y da recomendaciones.
+                        Explícale al nadador/corredor la evolución en eficiencia biomecánica, gasto cardíaco y consejos prácticos.
                         """
                         
                         respuesta_ia = consultar_gemini_coach(prompt)
