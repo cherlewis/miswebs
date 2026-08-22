@@ -123,10 +123,11 @@ def procesar_telemetria(df, es_natacion=False):
         df['heart_rate_raw'] = df['heart_rate']
         df['heart_rate'] = df['heart_rate'].rolling(window=5, min_periods=1).mean()
 
-    # 5. Coste Cardíaco y Factor de Eficiencia Instantáneo
+    # 5. Coste Cardiovascular (Latidos por 100m en Natación / Latidos por km en Carrera) y EF
     if 'ritmo_suavizado' in df.columns and 'heart_rate' in df.columns:
-        df['latidos_por_km'] = df['heart_rate'] * df['ritmo_suavizado']
-        df['latidos_por_km_suavizado'] = df['latidos_por_km'].rolling(window=15, min_periods=1).mean()
+        df['coste_cardio'] = df['heart_rate'] * df['ritmo_suavizado']
+        df['coste_cardio_suavizado'] = df['coste_cardio'].rolling(window=15, min_periods=1).mean()
+        df['latidos_por_km_suavizado'] = df['coste_cardio_suavizado'] # Alias de compatibilidad
         
         # EF Instantáneo = Velocidad (m/min) / FC
         if 'speed' in df.columns:
@@ -233,7 +234,6 @@ def leer_fichero_fit(file_bytes, file_name):
     df_laps = pd.DataFrame(laps)
     df_lengths = pd.DataFrame(lengths)
     
-    # Procesar métricas adicionales de piscina si hay df_lengths
     if metadata['es_natacion']:
         if not df_lengths.empty and 'total_strokes' in df_lengths.columns:
             stk_val = df_lengths['total_strokes'].dropna()
@@ -243,7 +243,6 @@ def leer_fichero_fit(file_bytes, file_name):
                 if metadata['brazadas_por_largo_medio'] > 0:
                     metadata['dps_medio'] = round(pisc_len / metadata['brazadas_por_largo_medio'], 2)
 
-        # Cálculo de respaldo para DPS si no venían lengths
         if metadata['dps_medio'] is None and metadata['brazadas_totales'] > 0 and metadata['distancia_total'] > 0:
             metadata['dps_medio'] = round(metadata['distancia_total'] / metadata['brazadas_totales'], 2)
             if metadata['largos_totales'] > 0:
@@ -466,7 +465,6 @@ if uploaded_files:
                 c_sw2.metric("Drop-off Brazadas", f"{fatiga['drop_off_brazadas_pct']:+.1f}%", help="Variación de brazadas por largo entre el 1º y último 25% del entreno")
                 c_sw3.metric("Drop-off Ritmo", f"{fatiga['drop_off_ritmo_pct']:+.1f}%", help="Variación de ritmo entre inicio y final")
                 
-                # Coste cardiovascular en natación (Latidos por 100m)
                 ritmo_med_100 = (meta['duracion_total'] / (meta['distancia_total'] / 100.0)) / 60.0 if meta['distancia_total'] > 0 else 0
                 latidos_100m = int(meta['fc_media'] * ritmo_med_100) if meta['fc_media'] and ritmo_med_100 > 0 else "N/A"
                 c_sw4.metric("Coste Cardiovascular", f"{latidos_100m} lat/100m" if latidos_100m != "N/A" else "N/A", help="Latidos consumidos para completar 100m")
@@ -525,9 +523,9 @@ if uploaded_files:
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-            # EVOLUCIÓN SWOLF POR LARGO / INTERVALO (Para natación)
+            # EVOLUCIÓN SWOLF POR LARGO (En natación)
             if es_nat and not lengths.empty and 'avg_swolf' in lengths.columns:
-                st.subheader("🏊 Evolution de SWOLF por Largo")
+                st.subheader("🏊 Evolución de SWOLF por Largo")
                 df_len_act = lengths[lengths['length_type'] != 0].copy() if 'length_type' in lengths.columns else lengths.copy()
                 if not df_len_act.empty:
                     df_len_act['Largo_Num'] = range(1, len(df_len_act) + 1)
@@ -535,40 +533,44 @@ if uploaded_files:
                     fig_sw.update_layout(xaxis_title="Número de Largo", yaxis_title="SWOLF (Tiempo + Brazadas)")
                     st.plotly_chart(fig_sw, use_container_width=True)
 
-            # RELACIÓN RITMO - FRECUENCIA CARDÍACA (En Carrera)
-            if not es_nat and 'latidos_por_km_suavizado' in df.columns:
+            # NUEVA SECCIÓN HABILITADA PARA TODOS (PISCINA Y CARRERA): RELACIÓN RITMO - FRECUENCIA CARDÍACA
+            if not df.empty and 'coste_cardio_suavizado' in df.columns and 'heart_rate' in df.columns and not df['heart_rate'].isna().all():
                 st.markdown("---")
-                st.subheader("❤️⚡ Relación Ritmo / Frecuencia Cardíaca (Eficiencia en Carrera)")
+                unit_label = "100m" if es_nat else "km"
+                st.subheader(f"❤️⚡ Coste Cardiovascular (Latidos por {unit_label}) & Dispersión Ritmo vs. PPM")
                 
                 col_ef1, col_ef2 = st.columns(2)
                 
                 with col_ef1:
-                    st.markdown("**Coste Cardíaco en el Tiempo (Latidos por Kilómetro)**")
+                    st.markdown(f"**Evolución del Coste Cardiovascular (Latidos por {unit_label})**")
                     fig_lpk = go.Figure()
                     fig_lpk.add_trace(go.Scatter(
-                        x=df['Tiempo_Segundos'], y=df['latidos_por_km_suavizado'],
-                        mode='lines', name='Coste (latidos/km)',
+                        x=df['Tiempo_Segundos'], y=df['coste_cardio_suavizado'],
+                        mode='lines', name=f'Coste (latidos/{unit_label})',
                         line=dict(color='#FFA15A', width=2),
-                        hovertemplate="Coste: %{y:.0f} latidos/km<extra></extra>"
+                        hovertemplate=f"Coste: %{{y:.0f}} latidos/{unit_label}<extra></extra>"
                     ))
                     for v_seg in vueltas_tiempos:
                         fig_lpk.add_vline(x=v_seg, line_width=1, line_dash="dash", line_color="gray")
                     fig_lpk.update_layout(
                         xaxis=dict(title="Tiempo", tickvals=tick_vals, ticktext=tick_texts),
-                        yaxis=dict(title="Latidos consumidos / km"),
+                        yaxis=dict(title=f"Latidos consumidos / {unit_label}"),
                         showlegend=False
                     )
                     st.plotly_chart(fig_lpk, use_container_width=True)
 
                 with col_ef2:
-                    st.markdown("**Dispersión: Ritmo vs Frecuencia Cardíaca**")
+                    st.markdown("**Dispersión: Ritmo vs. Frecuencia Cardíaca**")
                     df_scatter = df.dropna(subset=['ritmo_suavizado', 'heart_rate'])
-                    df_scatter = df_scatter[(df_scatter['ritmo_suavizado'] >= 3.0) & (df_scatter['ritmo_suavizado'] <= 12.0)]
+                    min_r = 0.5 if es_nat else 3.0
+                    max_r = 10.0 if es_nat else 12.0
+                    df_scatter = df_scatter[(df_scatter['ritmo_suavizado'] >= min_r) & (df_scatter['ritmo_suavizado'] <= max_r)]
                     
+                    lbl_r = "Ritmo (min/100m)" if es_nat else "Ritmo (min/km)"
                     fig_scat = px.scatter(
                         df_scatter, x='heart_rate', y='ritmo_suavizado',
                         color='Tiempo_Segundos',
-                        labels={'heart_rate': 'Frecuencia Cardíaca (ppm)', 'ritmo_suavizado': 'Ritmo (min/km)', 'Tiempo_Segundos': 'Segundos'},
+                        labels={'heart_rate': 'FC (ppm)', 'ritmo_suavizado': lbl_r, 'Tiempo_Segundos': 'Segundos'},
                         color_continuous_scale='Viridis'
                     )
                     fig_scat.update_layout(yaxis=dict(autorange="reversed"))
@@ -582,7 +584,7 @@ if uploaded_files:
                 fig_cad.update_layout(xaxis_title="Tiempo", yaxis_title="Frecuencia")
                 st.plotly_chart(fig_cad, use_container_width=True)
 
-            # Mapa GPS Ocultable (Solo si hay coordenadas de exterior)
+            # Mapa GPS Ocultable
             if 'lat' in df.columns and 'lon' in df.columns and not df['lat'].dropna().empty:
                 st.subheader("🗺️ Trazado de Ruta GPS")
                 if st.toggle("Mostrar Mapa de Ruta", value=True, key=f"tog_map_{idx_sel}"):
@@ -627,7 +629,7 @@ if uploaded_files:
                 with col_m:
                     metrica_comp = st.radio(
                         "Métrica a visualizar:",
-                        ["Frecuencia Cardíaca (ppm)", "Ritmo", "Cadencia", "Coste Cardíaco (Latidos/km)", "Factor de Eficiencia (EF)"],
+                        ["Frecuencia Cardíaca (ppm)", "Ritmo", "Cadencia", "Coste Cardíaco (Latidos/100m o km)", "Factor de Eficiencia (EF)"],
                         horizontal=True
                     )
                 with col_e:
@@ -701,8 +703,9 @@ if uploaded_files:
                     elif metrica_comp == "Cadencia" and 'cadence_spm' in df_c.columns:
                         y_vals = df_c['cadence_spm']
                         y_title = "Brazadas/min" if d['meta']['es_natacion'] else "Pasos/min"
-                    elif metrica_comp == "Coste Cardíaco (Latidos/km)" and 'latidos_por_km_suavizado' in df_c.columns:
-                        y_vals = df_c['latidos_por_km_suavizado']
+                    elif metrica_comp == "Coste Cardíaco (Latidos/100m o km)" and 'coste_cardio_suavizado' in df_c.columns:
+                        y_vals = df_c['coste_cardio_suavizado']
+                        y_title = "Latidos/100m" if d['meta']['es_natacion'] else "Latidos/km"
                     elif metrica_comp == "Factor de Eficiencia (EF)" and 'ef_suavizado' in df_c.columns:
                         y_vals = df_c['ef_suavizado']
                         y_title = "EF (m/min por latido)"
@@ -800,4 +803,3 @@ if uploaded_files:
                         
                         respuesta_ia = consultar_gemini_coach(prompt)
                         st.markdown(f"```\n{respuesta_ia}\n```")
-                
