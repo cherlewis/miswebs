@@ -25,10 +25,11 @@
         }
     </style>
 </head>
-<body class="bg-animado min-h-screen text-slate-100 flex items-center justify-center p-4">
+<body class="bg-animado min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6">
 
-    <div class="max-w-3xl w-full">
+    <div class="max-w-4xl w-full py-6">
         
+        <!-- Header con avatar y título -->
         <div class="text-center mb-10">
             <div class="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm border border-white/20 shadow-xl">
                 <span class="text-4xl">🚀</span>
@@ -37,37 +38,48 @@
             <p class="text-slate-400 font-medium">Acceso rápido a todos mis proyectos y herramientas</p>
         </div>
 
+        <!-- Sección de Aplicaciones -->
         <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 ml-1">Mis Aplicaciones</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-10">
             
+            <!-- Gimnasio -->
             <a href="https://cherlewis.github.io/migym/index.html" target="_blank" class="group block bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400 rounded-2xl p-5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] backdrop-blur-sm">
                 <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform origin-left">🏋️‍♂️</div>
                 <h3 class="text-lg font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">Gimnasio</h3>
                 <p class="text-xs text-slate-400">Rutinas y entrenamiento</p>
             </a>
 
+            <!-- Recetas UCAM -->
             <a href="https://cherlewis.github.io/recetasucam/index.html" target="_blank" class="group block bg-white/5 hover:bg-white/10 border border-white/10 hover:border-green-400 rounded-2xl p-5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(34,197,94,0.2)] backdrop-blur-sm">
                 <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform origin-left">🥑</div>
                 <h3 class="text-lg font-bold text-white mb-1 group-hover:text-green-400 transition-colors">Recetas UCAM</h3>
                 <p class="text-xs text-slate-400">Menús semanales y recetario</p>
             </a>
 
+            <!-- Dividendos -->
             <a href="https://misdividendos.streamlit.app/" target="_blank" class="group block bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-400 rounded-2xl p-5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] backdrop-blur-sm">
                 <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform origin-left">📈</div>
                 <h3 class="text-lg font-bold text-white mb-1 group-hover:text-purple-400 transition-colors">Dividendos</h3>
                 <p class="text-xs text-slate-400">Control de cartera en Streamlit</p>
             </a>
 
-
-            <a href="https://athlete-analytic.streamlit.app/" target="_blank" class="group block bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-400 rounded-2xl p-5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] backdrop-blur-sm">
-                <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform origin-left">📈</div>
-                <h3 class="text-lg font-bold text-white mb-1 group-hover:text-purple-400 transition-colors">Ficheros .FIT</h3>
-                <p class="text-xs text-slate-400">Lectura ficheros .fit</p>
+            <!-- Ficheros .FIT -->
+            <a href="https://athlete-analytic.streamlit.app/" target="_blank" class="group block bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-400 rounded-2xl p-5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(251,191,36,0.2)] backdrop-blur-sm">
+                <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform origin-left">⚡</div>
+                <h3 class="text-lg font-bold text-white mb-1 group-hover:text-amber-400 transition-colors">Ficheros .FIT</h3>
+                <p class="text-xs text-slate-400">Lectura y analítica de ficheros .fit</p>
             </a>
 
+            <!-- PrintInventory / Flota Impresoras -->
+            <a href="https://printinventory.streamlit.app/" target="_blank" class="group block bg-white/5 hover:bg-white/10 border border-white/10 hover:border-sky-400 rounded-2xl p-5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(56,189,248,0.25)] backdrop-blur-sm">
+                <div class="text-4xl mb-3 transform group-hover:scale-110 transition-transform origin-left">🖨️</div>
+                <h3 class="text-lg font-bold text-white mb-1 group-hover:text-sky-400 transition-colors">PrintInventory</h3>
+                <p class="text-xs text-slate-400">Flota Xerox EU, Hardening y SQLite</p>
+            </a>
 
         </div>
 
+        <!-- Sección de Administración y Repositorios -->
         <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 ml-1">Administración y Bases de Datos</h2>
         <div class="bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm">
             
@@ -80,6 +92,17 @@
                     </div>
                 </div>
                 <svg class="w-5 h-5 text-slate-600 group-hover:text-blue-400 transition-colors transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </a>
+
+            <a href="https://github.com/cherlewis/printinventory/blob/main/app.py" target="_blank" class="flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/10 transition-colors group">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🖨️</span>
+                    <div>
+                        <h4 class="font-semibold text-slate-200 group-hover:text-sky-400 transition-colors">Código PrintInventory (GitHub)</h4>
+                        <p class="text-xs text-slate-500">Consola de impresoras y base de datos SQLite</p>
+                    </div>
+                </div>
+                <svg class="w-5 h-5 text-slate-600 group-hover:text-sky-400 transition-colors transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </a>
 
             <a href="https://supabase.com" target="_blank" class="flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/10 transition-colors group">
@@ -106,6 +129,7 @@
 
         </div>
 
+        <!-- Footer -->
         <div class="mt-12 text-center text-xs text-slate-600">
             <p>Creado para simplificar la gestión de proyectos.</p>
         </div>
