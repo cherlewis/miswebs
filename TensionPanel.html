@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TensioPanel Pro — Informe Avanzado de Presión Arterial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F8F9FA;
+  --surface:#FFFFFF;
+  --ink:#152238;
+  --ink-soft:#5B6472;
+  --ink-faint:#8B93A1;
+  --blue:#0052CC;
+  --blue-soft:#E8F0FE;
+  --green:#28A745;
+  --green-soft:#E9F7EC;
+  --yellow:#FFC107;
+  --yellow-soft:#FFF8E1;
+  --red:#DC3545;
+  --red-soft:#FDECEA;
+  --border:#E3E6EA;
+  --shadow: 0 1px 2px rgba(21,34,56,.04), 0 4px 16px rgba(21,34,56,.05);
+  --radius: 14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+a{color:var(--blue);}
+button{font-family:inherit;}
+
+.shell{max-width:1180px;margin:0 auto;padding:20px 22px 60px;}
+
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;padding:14px 20px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow); margin-bottom:16px; flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:var(--blue);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-name{font-weight:800;font-size:16px;letter-spacing:-.01em;}
+.brand-sub{font-size:11.5px;color:var(--ink-faint);font-weight:600;letter-spacing:.03em;text-transform:uppercase;margin-top:1px;}
+.topbar-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+
+.btn{
+  border:1px solid var(--border); background:var(--surface); color:var(--ink);
+  padding:9px 14px; border-radius:9px; font-size:13.5px; font-weight:600;
+  cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:.15s;
+}
+.btn:hover{border-color:var(--blue);color:var(--blue);}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-primary:hover{background:#0040a3;color:#fff;}
+.btn svg{width:15px;height:15px;flex-shrink:0;}
+input[type=file]{display:none;}
+
+.empty{
+  background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--radius);
+  padding:70px 30px;text-align:center;color:var(--ink-soft);
+}
+.empty svg{width:52px;height:52px;color:var(--blue);margin-bottom:14px;}
+.empty h2{margin:0 0 6px;font-size:19px;color:var(--ink);}
+.empty p{margin:0 auto 20px;max-width:440px;font-size:14px;line-height:1.6;}
+
+.report{display:none;}
+.report.active{display:block;}
+
+.patient-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:18px 22px; margin-bottom:14px;
+  display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
+}
+.patient-fields{display:flex;gap:22px;flex-wrap:wrap;flex:1;}
+.field{display:flex;flex-direction:column;gap:5px;min-width:150px;}
+.field label{font-size:10.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;}
+.field input, .field select{
+  border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:14px;
+  font-family:inherit; font-weight:600; color:var(--ink); background:var(--bg);
+  min-width:150px;
+}
+.field.wide input{min-width:260px;}
+.range-pill{
+  background:var(--blue-soft); color:var(--blue); font-weight:700; font-size:12.5px;
+  padding:8px 14px; border-radius:20px; white-space:nowrap; display:flex; align-items:center; gap:6px;
+}
+
+.period-bar{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:14px 20px; margin-bottom:16px;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.seg{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;}
+.seg button{
+  border:none;background:transparent;padding:7px 13px;border-radius:7px;font-size:13px;font-weight:600;
+  color:var(--ink-soft);cursor:pointer;
+}
+.seg button.active{background:var(--blue);color:#fff;}
+.period-bar select, .period-bar input[type=date]{
+  border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13.5px;font-weight:600;
+  font-family:inherit;color:var(--ink);background:var(--bg);
+}
+.period-summary{margin-left:auto;font-size:12.5px;color:var(--ink-faint);font-weight:600;}
+.period-summary b{color:var(--ink);}
+
+.section-title{
+  display:flex;align-items:center;gap:9px;margin:26px 0 12px;
+}
+.section-title .bar{width:4px;height:17px;background:var(--blue);border-radius:3px;}
+.section-title h3{margin:0;font-size:15px;font-weight:800;letter-spacing:-.01em;}
+.section-title .hint{font-size:12px;color:var(--ink-faint);font-weight:500;margin-left:4px;}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+.kpi-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:14px 12px; display:flex; flex-direction:column; align-items:center;
+  text-align:center; gap:6px;
+}
+.kpi-card .ring-wrap{position:relative;width:100px;height:100px;}
+.kpi-card svg{width:100px;height:100px;transform:rotate(-90deg);}
+.kpi-card .ring-center{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.kpi-card .ring-value{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:18px;line-height:1.05;}
+.kpi-card .ring-value small{font-size:10.5px;font-weight:600;color:var(--ink-faint);display:block;margin-top:2px;}
+.kpi-card .kpi-label{font-size:11.5px;font-weight:700;color:var(--ink);}
+.kpi-card .kpi-badge{
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;
+}
+.badge-green{background:var(--green-soft);color:#1c7a34;}
+.badge-yellow{background:var(--yellow-soft);color:#8a6400;}
+.badge-red{background:var(--red-soft);color:var(--red);}
+.badge-blue{background:var(--blue-soft);color:var(--blue);}
+
+.dist-bar{display:flex;width:100%;height:14px;border-radius:7px;overflow:hidden;background:#EEF0F2;}
+.dist-seg{height:100%;}
+.dist-legend-item{display:inline-flex;align-items:center;gap:5px;font-weight:600;}
+.cat-badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;display:inline-block;}
+
+.adv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:10px;}
+.adv-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:14px 16px; display:flex; justify-content:space-between; align-items:center;
+}
+.adv-info{display:flex;flex-direction:column;gap:2px;}
+.adv-title{font-size:12px;font-weight:700;color:var(--ink);}
+.adv-sub{font-size:10.5px;color:var(--ink-faint);}
+.adv-val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:var(--blue);}
+
+.chart-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:18px 20px;
+}
+.chart-card + .chart-card{margin-top:10px;}
+.chart-card h4{margin:0 0 4px;font-size:13px;font-weight:700;}
+.chart-card .sub{font-size:11.5px;color:var(--ink-faint);margin-bottom:10px;}
+.legend-row{display:flex;gap:16px;font-size:11.5px;color:var(--ink-soft);margin-bottom:2px;flex-wrap:wrap;}
+.legend-row span{display:inline-flex;align-items:center;gap:5px;font-weight:600;}
+.legend-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+.chart-canvas-wrap{position:relative;height:220px;}
+.chart-canvas-wrap.short{height:110px;}
+
+.block-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.block-table th{
+  text-align:left;font-size:10px;color:var(--ink-faint);font-weight:700;text-transform:uppercase;
+  letter-spacing:.03em;padding:0 10px 8px;border-bottom:1px solid var(--border);
+}
+.block-table td{padding:10px;border-bottom:1px solid var(--border);}
+.block-table tr:last-child td{border-bottom:none;}
+.block-name{display:flex;align-items:center;gap:8px;font-weight:700;}
+
+.log-wrap{max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;}
+table.log{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.log thead th{
+  position:sticky;top:0;background:var(--bg);text-align:left;padding:9px 12px;
+  font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em;font-weight:700;
+  border-bottom:1px solid var(--border); z-index:1;
+}
+table.log td{padding:8px 12px;border-bottom:1px solid #EEF0F2;}
+table.log tbody tr:hover{background:var(--bg);}
+table.log td.mono-cell{font-family:'IBM Plex Mono',monospace;font-weight:600;}
+.row-alert td{background:var(--red-soft);}
+.row-alert .mono-cell.flag{color:var(--red);font-weight:700;}
+.log-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.log-count{font-size:12px;color:var(--ink-faint);font-weight:600;}
+.legend-inline{display:flex;gap:14px;font-size:11.5px;color:var(--ink-soft);}
+.legend-inline span{display:inline-flex;align-items:center;gap:5px;}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+footer{margin-top:36px;text-align:center;font-size:11.5px;color:var(--ink-faint);}
+
+#importNotice{background:var(--yellow-soft);border:1px solid #F0D488;border-radius:12px;padding:10px 16px;margin-bottom:14px;font-size:12.5px;color:#7a5c00;display:flex;align-items:center;gap:8px;}
+#importNotice b{font-weight:800;}
+.info-ico{cursor:help;color:var(--ink-faint);font-size:11px;margin-left:3px;}
+.kpi-explain{font-size:10.5px;color:var(--ink-faint);line-height:1.4;margin-top:2px;max-width:150px;}
+.trend-badge{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;padding:6px 12px;border-radius:20px;}
+
+@media (max-width: 1000px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr) !important;}
+  .adv-grid{grid-template-columns:1fr !important;}
+}
+@media (max-width: 600px){
+  .kpi-grid{grid-template-columns:1fr 1fr !important;}
+}
+
+@media print{
+  body{background:#fff;}
+  .topbar .btn, .period-bar, #periodSeg, #fileInput{display:none !important;}
+  .shell{max-width:100%;padding:0;}
+  .patient-card,.period-bar,.kpi-card,.chart-card{box-shadow:none;border:1px solid #CCC;}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2 4.5 5.4 3.7c2-.5 4 .3 5.1 2 .5-.8 1.4-1.6 2.5-1.9M22 12h-4l-2 4-3-8-2 4H7"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">TensioPanel Pro</div>
+        <div class="brand-sub">Análisis avanzado de presión arterial</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <label class="btn btn-primary" for="fileInput">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        Cargar Excel
+      </label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <button class="btn btn-print" id="printBtn" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/></svg>
+        Imprimir / PDF
+      </button>
+    </div>
+  </div>
+
+  <div class="empty" id="emptyState">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    <h2>Cargue un registro de tomas para generar el informe completo</h2>
+    <p>Suba el archivo Excel de su tensiómetro. Se calcularán automáticamente la PAM (Presión Arterial Media), Presión de Pulso (PP), Carga de Hipertensión y el Patrón Circadiano Nocturno (Dipping Ratio).</p>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Seleccionar archivo .xlsx</button>
+  </div>
+
+  <div class="report" id="report">
+
+    <div id="importNotice" style="display:none;"></div>
+
+    <div class="patient-card">
+      <div class="patient-fields">
+        <div class="field wide">
+          <label>Paciente</label>
+          <input type="text" id="pName" value="José Antonio Nicolás Saavedra">
+        </div>
+        <div class="field" style="min-width:70px;">
+          <label>Edad</label>
+          <input type="text" id="pAge" value="49">
+        </div>
+        <div class="field wide" style="min-width:320px;">
+          <label>Tratamiento farmacológico activo</label>
+          <input type="text" id="pTreat" value="06:00 Olmesartán 20mg (ARA-II) · 18:00 Artedil 10mg / manidipino (antagonista calcio)">
+        </div>
+      </div>
+      <div class="range-pill" id="rangePill">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span id="rangeText">—</span>
+      </div>
+    </div>
+
+    <div class="period-bar">
+      <div class="seg" id="periodSeg">
+        <button data-mode="all" class="active">Periodo completo</button>
+        <button data-mode="week">Semana</button>
+        <button data-mode="month">Mes</button>
+        <button data-mode="custom">Personalizado</button>
+      </div>
+      <select id="periodPick" style="display:none;"></select>
+      <div id="customRange" style="display:none;gap:8px;align-items:center;">
+        <input type="date" id="customFrom"> <span style="color:var(--ink-faint);font-size:12px;">a</span> <input type="date" id="customTo">
+      </div>
+      <div class="period-summary"><b id="sumCount">0</b> tomas en el periodo seleccionado</div>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="adv-grid" id="advGrid"></div>
+
+    <div class="chart-card" style="margin-top:10px;padding:14px 20px;">
+      <h4 style="margin-bottom:2px;">Distribución por categoría clínica en domicilio (AMPA)</h4>
+      <div class="sub" style="margin-bottom:12px;">Clasificación de la Sociedad Europea de Hipertensión (ESH/ESC)</div>
+      <div id="distBar"></div>
+      <div id="distLegend" class="legend-row" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="section-title"><div class="bar"></div><h3>Perfil horario circadiano de 24 horas</h3><span class="hint">promedio de todas las tomas agrupadas por hora</span></div>
+    <div class="chart-card">
+      <h4>Sistólica y Diastólica (mmHg) con umbral objetivo (135/85 día · 120/70 noche)</h4>
+      <div class="legend-row">
+        <span><i class="legend-dot" style="background:#0052CC;"></i>Sistólica</span>
+        <span><i class="legend-dot" style="background:#00A3A3;"></i>Diastólica</span>
+        <span><i class="legend-dot" style="background:#28A745;opacity:.35;"></i>Zona objetivo</span>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="chart24h"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>Frecuencia cardíaca promedio (ppm)</h4>
+      <div class="chart-canvas-wrap short"><canvas id="chartBpm"></canvas></div>
+    </div>
+
+    <div class="section-title"><div class="bar"></div><h3>Evolución general</h3><span class="hint">media diaria de todo el periodo, con línea de tendencia</span></div>
+    <div class="chart-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div class="legend-row" style="margin-bottom:0;">
+          <span><i class="legend-dot" style="background:#0052CC;"></i>Sistólica</span>
+          <span><i class="legend-dot" style="background:#00A3A3;"></i>Diastólica</span>
+          <span><i class="legend-dot" style="background:#8B93A1;"></i>Tendencia (sistólica)</span>
+        </div>
+        <div id="trendBadge"></div>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="chartEvolution"></canvas></div>
+    </div>
+
+    <div class="section-title"><div class="bar"></div><h3>Resumen por franjas horarias con PAM y PP</h3></div>
+    <div class="chart-card" style="padding:8px 20px 16px;">
+      <table class="block-table" id="blockTable"><thead>
+        <tr><th>Franja</th><th>Prom. SYS/DIA</th><th>PAM</th><th>PP</th><th>Prom. BPM</th><th>Mínimo</th><th>Máximo</th><th>Estado</th></tr>
+      </thead><tbody></tbody></table>
+    </div>
+
+    <div class="section-title"><div class="bar"></div><h3>Historial detallado</h3></div>
+    <div class="chart-card">
+      <div class="log-controls">
+        <div class="log-count"><span id="logCount">0</span> registros en el periodo</div>
+        <div class="legend-inline">
+          <span><i class="sw" style="background:var(--red-soft);border:1px solid var(--red);"></i>SYS &ge; 135 o DIA &ge; 85 mmHg (AMPA)</span>
+        </div>
+      </div>
+      <div class="log-wrap">
+        <table class="log">
+          <thead><tr><th>Fecha</th><th>Hora</th><th>SYS</th><th>DIA</th><th>PAM</th><th>PP</th><th>Pulso</th><th>Categoría</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>Los datos se procesan exclusivamente en su navegador local.</footer>
+  </div>
+</div>
+
+<script>
+let RECORDS = [];
+let charts = {};
+let periodMode = 'all';
+let IMPORT_STATS = null;
+const DAY_START = 7, NIGHT_START = 23;
+
+const MONTHS_ES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function normHeader(h){ return (h||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+
+function parseUniversalDate(val){
+  if(!val) return null;
+  if(val instanceof Date) return val;
+  if(typeof val === 'number'){
+    const dateObj = XLSX.SSF.parse_date_code(val);
+    if(dateObj) return new Date(dateObj.y, dateObj.m - 1, dateObj.d, dateObj.H || 0, dateObj.M || 0);
+  }
+  const s = val.toString().trim().toLowerCase();
+  const mEs = s.match(/(\d{1,2})[\s\/\-]+([a-z]{3,4})\.?[\s\/\-]+(\d{4})/);
+  if(mEs){
+    const day = parseInt(mEs[1],10);
+    const monKey = mEs[2].slice(0,3);
+    const mon = MONTHS_ES[monKey];
+    const year = parseInt(mEs[3],10);
+    if(mon !== undefined) return new Date(year, mon, day);
+  }
+  const mNum = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(mNum) return new Date(parseInt(mNum[3],10), parseInt(mNum[2],10)-1, parseInt(mNum[1],10));
+  const d2 = new Date(s);
+  return isNaN(d2.getTime()) ? null : d2;
+}
+
+function parseTime(val){
+  if(val instanceof Date) return {h:val.getHours(), m:val.getMinutes()};
+  if(typeof val === 'number'){
+    const totalSecs = Math.round(val * 86400);
+    return {h: Math.floor(totalSecs / 3600) % 24, m: Math.floor((totalSecs % 3600) / 60)};
+  }
+  const raw = (val||'').toString().trim().toLowerCase();
+  const pm = /p\.?\s*m\.?/.test(raw);
+  const am = /a\.?\s*m\.?/.test(raw);
+  const m = raw.match(/(\d{1,2}):(\d{2})/);
+  if(m){
+    let h = parseInt(m[1],10), min = parseInt(m[2],10);
+    if(pm && h<12) h += 12;   // "06:00 p.m." -> 18:00 (this was the bug: PM readings were read as AM, so afternoon/night readings vanished into the morning block)
+    if(am && h===12) h = 0;   // "12:00 a.m." -> 00:00
+    return {h, m:min};
+  }
+  const dec = raw.replace(',', '.').match(/^0?\.\d+$/);
+  if(dec){
+    const totalMin = Math.round(parseFloat(dec[0]) * 1440);
+    return {h: Math.floor(totalMin/60)%24, m: totalMin%60};
+  }
+  return {h:0, m:0};
+}
+
+function loadWorkbook(file){
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+      if(!rows.length) throw new Error('vacío');
+
+      let headerRowIdx = 0;
+      for(let i=0; i<Math.min(5, rows.length); i++){
+        const rowNorm = rows[i].map(normHeader);
+        if(rowNorm.some(h => h.includes('fecha') || h.includes('date') || h.includes('sist'))){
+          headerRowIdx = i; break;
+        }
+      }
+
+      const headers = rows[headerRowIdx].map(normHeader);
+      const idx = {
+        fecha: headers.findIndex(h=>h.includes('fecha') || h.includes('date')),
+        hora: headers.findIndex(h=>h.includes('hora') || h.includes('time')),
+        sys: headers.findIndex(h=>h.includes('sist') || h.includes('sys')),
+        dia: headers.findIndex(h=>h.includes('diast') || h.includes('dia')),
+        bpm: headers.findIndex(h=>h.includes('pulso')||h.includes('bpm')||h.includes('frecuencia')||h.includes('pulse'))
+      };
+
+      if(idx.fecha<0 || idx.sys<0 || idx.dia<0){
+        alert('No se reconocieron las columnas. Asegúrese de incluir: Fecha, Sistólica y Diastólica.');
+        return;
+      }
+
+      const recs = [];
+      let skippedNoDate = 0, skippedNoValues = 0, totalDataRows = 0;
+      for(let i=headerRowIdx+1; i<rows.length; i++){
+        const r = rows[i];
+        if(!r || r.length===0 || r.every(c=>c==='' || c==null)) continue;
+        totalDataRows++;
+        const dt = parseUniversalDate(r[idx.fecha]);
+        if(!dt){ skippedNoDate++; continue; }
+        const t = idx.hora>=0 ? parseTime(r[idx.hora]) : {h:dt.getHours(), m:dt.getMinutes()};
+        const sys = parseFloat(r[idx.sys]);
+        const dia = parseFloat(r[idx.dia]);
+        const bpm = idx.bpm>=0 ? parseFloat(r[idx.bpm]) : NaN;
+        if(isNaN(sys) || isNaN(dia)){ skippedNoValues++; continue; }
+
+        const pam = dia + (sys - dia)/3;
+        const pp = sys - dia;
+
+        const full = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), t.h, t.m);
+        recs.push({ date: full, hour: t.h, minute: t.m, sys, dia, pam, pp, bpm: isNaN(bpm) ? null : bpm });
+      }
+
+      if(!recs.length){ alert('No se extrajeron tomas válidas.'); return; }
+      recs.sort((a,b)=>a.date-b.date);
+      RECORDS = recs;
+      IMPORT_STATS = {total: totalDataRows, ok: recs.length, skippedNoDate, skippedNoValues};
+      onDataLoaded();
+    }catch(err){
+      console.error(err);
+      alert('Error al leer el archivo Excel.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function isDayHour(h){ return h>=DAY_START && h<NIGHT_START; }
+function fmtDate(d){ return d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtDateShort(d){ return d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'}); }
+function pad(n){ return n.toString().padStart(2,'0'); }
+function mean(arr){ return arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+function weekKey(d){
+  const dt = new Date(d);
+  const day = (dt.getDay()+6)%7;
+  dt.setDate(dt.getDate()-day);
+  dt.setHours(0,0,0,0);
+  return dt.getTime();
+}
+function monthKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1); }
+
+function getPeriodOptions(){
+  const weeks = new Map(), months = new Map();
+  RECORDS.forEach(r=>{
+    const wk = weekKey(r.date); if(!weeks.has(wk)) weeks.set(wk, []); weeks.get(wk).push(r);
+    const mk = monthKey(r.date); if(!months.has(mk)) months.set(mk, []); months.get(mk).push(r);
+  });
+  return {weeks, months};
+}
+
+function currentFilteredRecords(){
+  if(!RECORDS.length) return [];
+  const sel = document.getElementById('periodPick');
+  if(periodMode === 'all') return RECORDS;
+  if(periodMode === 'week') return RECORDS.filter(r=>weekKey(r.date)===parseInt(sel.value,10));
+  if(periodMode === 'month') return RECORDS.filter(r=>monthKey(r.date)===sel.value);
+  if(periodMode === 'custom'){
+    const from = document.getElementById('customFrom').value;
+    const to = document.getElementById('customTo').value;
+    const fromD = from? new Date(from+'T00:00:00') : null;
+    const toD = to? new Date(to+'T23:59:59') : null;
+    return RECORDS.filter(r=> (!fromD||r.date>=fromD) && (!toD||r.date<=toD));
+  }
+  return RECORDS;
+}
+
+function populatePeriodPicker(){
+  const sel = document.getElementById('periodPick');
+  sel.innerHTML = '';
+  const {weeks, months} = getPeriodOptions();
+  if(periodMode==='week'){
+    [...weeks.keys()].sort((a,b)=>b-a).forEach(k=>{
+      const start = new Date(k), end = new Date(k); end.setDate(end.getDate()+6);
+      const opt = document.createElement('option'); opt.value = k;
+      opt.textContent = `Semana ${fmtDateShort(start)} - ${fmtDateShort(end)} (${weeks.get(k).length} tomas)`;
+      sel.appendChild(opt);
+    });
+  } else if(periodMode==='month'){
+    [...months.keys()].sort().reverse().forEach(k=>{
+      const [y,m] = k.split('-');
+      const opt = document.createElement('option'); opt.value = k;
+      opt.textContent = `${MONTH_NAMES[parseInt(m,10)-1]} ${y} (${months.get(k).length} tomas)`;
+      sel.appendChild(opt);
+    });
+  }
+  sel.style.display = (periodMode==='week'||periodMode==='month') ? '' : 'none';
+}
+
+const CATS = [
+  {label:'Óptima Domicilio',  short:'Óptima',   color:'#1B8F4C', status:'green'},
+  {label:'Normal Domicilio',  short:'Normal',   color:'#28A745', status:'green'},
+  {label:'HTA Leve (AMPA)',   short:'HTA Leve', color:'#FFC107', status:'yellow'},
+  {label:'HTA Moderada',      short:'HTA Mod.', color:'#FF8A3D', status:'red'},
+  {label:'HTA Grave',         short:'HTA Grave',color:'#DC3545', status:'red'}
+];
+
+function classifyBP(sys, dia){
+  if(sys>=160 || dia>=100) return {status:'red', color:'#DC3545', label:'HTA Grave', short:'HTA Grave'};
+  if(sys>=145 || dia>=92)  return {status:'red', color:'#FF8A3D', label:'HTA Moderada', short:'HTA Mod.'};
+  if(sys>=135 || dia>=85)  return {status:'yellow', color:'#FFC107', label:'HTA Leve (AMPA)', short:'HTA Leve'};
+  if(sys>=120 || dia>=80)  return {status:'green', color:'#28A745', label:'Normal Domicilio', short:'Normal'};
+  return {status:'green', color:'#1B8F4C', label:'Óptima Domicilio', short:'Óptima'};
+}
+
+function computeKPIs(recs){
+  if(!recs.length) return null;
+  const dayRecs = recs.filter(r=>isDayHour(r.hour));
+  const nightRecs = recs.filter(r=>!isDayHour(r.hour));
+  const optimalCount = recs.filter(r=> r.sys<135 && r.dia<85 ).length;
+  const pctOptimal = (optimalCount/recs.length)*100;
+  
+  const daySys = mean(dayRecs.map(r=>r.sys)), dayDia = mean(dayRecs.map(r=>r.dia));
+  const nightSys = mean(nightRecs.map(r=>r.sys)), nightDia = mean(nightRecs.map(r=>r.dia));
+  
+  let dip = null, pattern = 'Sin datos nocturnos';
+  if(daySys!=null && nightSys!=null && daySys>0){
+    dip = ((daySys-nightSys)/daySys)*100;
+    if(dip>20) pattern='Dipper extremo';
+    else if(dip>=10) pattern='Dipper';
+    else if(dip>=0) pattern='Non-Dipper';
+    else pattern='Riser';
+  }
+
+  const avgPam = mean(recs.map(r=>r.pam));
+  const avgPp = mean(recs.map(r=>r.pp));
+  const cargaHta = (recs.filter(r=>r.sys>=135 || r.dia>=85).length / recs.length)*100;
+
+  const sysArr = recs.map(r=>r.sys);
+  const sdSys = sysArr.length>1 ? Math.sqrt(mean(sysArr.map(v=>Math.pow(v-mean(sysArr),2)))) : 0;
+  const peak = recs.reduce((a,b)=> b.sys>a.sys ? b : a, recs[0]);
+
+  return {pctOptimal, daySys, dayDia, nightSys, nightDia, dip, pattern, avgPam, avgPp, cargaHta, sdSys, peak, n:recs.length};
+}
+
+function ringGauge(pct, color){
+  pct = Math.max(0, Math.min(100, pct));
+  const r = 42, c = 2*Math.PI*r;
+  const offset = c - (pct/100)*c;
+  return `<svg viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="${r}" fill="none" stroke="#EEF0F2" stroke-width="8"/>
+    <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="8"
+      stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${offset}"/>
+  </svg>`;
+}
+
+function statusBadgeClass(status){ return status==='green'?'badge-green':status==='yellow'?'badge-yellow':'badge-red'; }
+function statusLabel(status){ return status==='green'?'Óptimo':status==='yellow'?'Elevado':'Alto'; }
+
+function buildKPICards(kpi){
+  const grid = document.getElementById('kpiGrid');
+  if(!kpi){ grid.innerHTML=''; return; }
+  const c1status = kpi.pctOptimal>=80?'green':kpi.pctOptimal>=60?'yellow':'red';
+  let c4status = kpi.pattern==='Dipper'?'green': kpi.pattern==='Dipper extremo'?'blue': kpi.pattern==='Non-Dipper'?'yellow':'red';
+
+  const cards = [
+    {
+      ring: ringGauge(kpi.pctOptimal, `var(--${c1status})`),
+      value: Math.round(kpi.pctOptimal)+'%', sub:'', label:'Tomas en rango seguro (<135/85)', status:c1status,
+      explain:'% de lecturas por debajo de 135/85 mmHg, el umbral de hipertensión para automedida en domicilio (ESH).'
+    },
+    {
+      ring: ringGauge(kpi.daySys?Math.min(100,(kpi.daySys/180)*100):0, kpi.daySys<135?'var(--green)':'var(--yellow)'),
+      value: kpi.daySys?Math.round(kpi.daySys)+'/'+Math.round(kpi.dayDia):'—', sub:'mmHg', label:'PA media diurna', status:kpi.daySys<135?'green':'yellow',
+      explain:'Media de sus lecturas entre las 07:00–23:00h. Objetivo saludable: por debajo de 135/85 mmHg.'
+    },
+    {
+      ring: ringGauge(kpi.nightSys?Math.min(100,(kpi.nightSys/180)*100):0, kpi.nightSys<120?'var(--green)':'var(--yellow)'),
+      value: kpi.nightSys?Math.round(kpi.nightSys)+'/'+Math.round(kpi.nightDia):'—', sub:'mmHg', label:'PA media nocturna', status:kpi.nightSys<120?'green':'yellow',
+      explain:'Media de sus lecturas entre las 23:00–07:00h, mientras duerme. Objetivo saludable: por debajo de 120/70 mmHg. "Elevado" no significa hipertensión — significa que está por encima de ese objetivo nocturno más estricto.'
+    },
+    {
+      ring: ringGauge(kpi.dip!=null?Math.max(0,Math.min(100,((kpi.dip+10)/40)*100)):0, `var(--${c4status})`),
+      value: kpi.dip!=null?kpi.dip.toFixed(1)+'%':'—', sub:'descenso', label: kpi.pattern, status:c4status,
+      explain:'Lo normal es que la tensión baje ≥10% mientras duerme respecto al día ("Dipper" — protege el corazón). Un descenso menor se llama "Non-Dipper"; si sube durante la noche se llama "Riser". No es un diagnóstico por sí solo, pero conviene comentarlo con su médico.'
+    },
+    {
+      ring: ringGauge(100-kpi.cargaHta, kpi.cargaHta<25?'var(--green)':'var(--red)'),
+      value: Math.round(kpi.cargaHta)+'%', sub:'tomas elevadas', label: 'Carga de hipertensión', status:kpi.cargaHta<25?'green':'red',
+      explain:'% de lecturas iguales o por encima de 135/85 mmHg. Cuanto mayor sea este porcentaje, más tiempo pasa su tensión fuera de rango.'
+    }
+  ];
+
+  grid.innerHTML = cards.map(c=>`
+    <div class="kpi-card">
+      <div class="ring-wrap">
+        ${c.ring}
+        <div class="ring-center"><div class="ring-value">${c.value}${c.sub?`<small>${c.sub}</small>`:''}</div></div>
+      </div>
+      <div class="kpi-label">${c.label}<span class="info-ico" title="${c.explain}">&nbsp;ⓘ</span></div>
+      <div class="kpi-badge ${c.status==='blue'?'badge-blue':statusBadgeClass(c.status)}">${c.status==='blue'?'Marcado':statusLabel(c.status)}</div>
+    </div>
+  `).join('');
+
+  const advGrid = document.getElementById('advGrid');
+  advGrid.innerHTML = `
+    <div class="adv-card">
+      <div class="adv-info"><span class="adv-title">Presión Arterial Media (PAM)</span><span class="adv-sub">Objetivo: 70–100 mmHg (perfusión de órganos)</span></div>
+      <div class="adv-val">${Math.round(kpi.avgPam)} <small style="font-size:12px;color:var(--ink-faint);">mmHg</small></div>
+    </div>
+    <div class="adv-card">
+      <div class="adv-info"><span class="adv-title">Presión de Pulso (PP)</span><span class="adv-sub">Objetivo: 30–50 mmHg (elasticidad arterial)</span></div>
+      <div class="adv-val" style="color:${kpi.avgPp>55?'var(--red)':'var(--blue)'};">${Math.round(kpi.avgPp)} <small style="font-size:12px;color:var(--ink-faint);">mmHg</small></div>
+    </div>
+    <div class="adv-card">
+      <div class="adv-info"><span class="adv-title">Estado de Elasticidad Vascular</span><span class="adv-sub">Basado en PP promedio</span></div>
+      <div class="adv-val" style="font-size:15px;font-weight:800;color:${kpi.avgPp>55?'var(--red)':'var(--green)'};">${kpi.avgPp>55?'Rigidez Leve':'Normal / Flexible'}</div>
+    </div>
+    <div class="adv-card">
+      <div class="adv-info"><span class="adv-title">Variabilidad de la PA (SD)</span><span class="adv-sub">Desviación estándar de la sistólica · ${kpi.sdSys>15?'variabilidad alta':'variabilidad normal'}</span></div>
+      <div class="adv-val" style="color:${kpi.sdSys>15?'var(--red)':'var(--blue)'};">±${Math.round(kpi.sdSys)} <small style="font-size:12px;color:var(--ink-faint);">mmHg</small></div>
+    </div>
+    <div class="adv-card">
+      <div class="adv-info"><span class="adv-title">Pico máximo registrado</span><span class="adv-sub">${fmtDate(kpi.peak.date)} · ${pad(kpi.peak.hour)}:${pad(kpi.peak.minute)}h</span></div>
+      <div class="adv-val" style="color:var(--red);">${Math.round(kpi.peak.sys)}/${Math.round(kpi.peak.dia)}</div>
+    </div>
+  `;
+}
+
+function buildDistribution(recs){
+  const counts = [0,0,0,0,0];
+  recs.forEach(r=>{
+    const cls = classifyBP(r.sys, r.dia);
+    if(cls.label==='Óptima Domicilio') counts[0]++;
+    else if(cls.label==='Normal Domicilio') counts[1]++;
+    else if(cls.label==='HTA Leve (AMPA)') counts[2]++;
+    else if(cls.label==='HTA Moderada') counts[3]++;
+    else counts[4]++;
+  });
+  const total = recs.length || 1;
+  const bar = document.getElementById('distBar');
+  const legend = document.getElementById('distLegend');
+  if(!bar) return;
+  
+  bar.innerHTML = `<div class="dist-bar">${CATS.map((c,i)=>{
+    const pct = (counts[i]/total)*100;
+    return pct>0 ? `<div class="dist-seg" style="width:${pct}%;background:${c.color};" title="${c.label}: ${counts[i]}"></div>` : '';
+  }).join('')}</div>`;
+
+  if(legend) legend.innerHTML = CATS.map((c,i)=>
+    `<span class="dist-legend-item"><i class="legend-dot" style="background:${c.color};"></i>${c.label} (${counts[i]})</span>`
+  ).join('');
+}
+
+function destroyChart(key){ if(charts[key]){ charts[key].destroy(); delete charts[key]; } }
+
+function build24hChart(buckets){
+  destroyChart('h24');
+  const labels = Array.from({length:24},(_,h)=>pad(h)+':00');
+  const ctx = document.getElementById('chart24h').getContext('2d');
+  charts.h24 = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'Sistólica', data:buckets.sys, borderColor:'#0052CC', backgroundColor:'rgba(0,82,204,0.12)', fill:true, tension:.35, pointRadius:3, borderWidth:2.4},
+      {label:'Diastólica', data:buckets.dia, borderColor:'#00A3A3', backgroundColor:'rgba(0,163,163,0.10)', fill:true, tension:.35, pointRadius:3, borderWidth:2.4}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      scales:{
+        y:{min:50, max:200, grid:{color:'#EEF0F2'}, ticks:{font:{size:10.5}}},
+        x:{grid:{display:false}, ticks:{font:{size:10}}}
+      },
+      plugins:{legend:{display:false}}
+    }
+  });
+}
+
+function buildBpmChart(buckets){
+  destroyChart('bpm');
+  const labels = Array.from({length:24},(_,h)=>pad(h)+':00');
+  const ctx = document.getElementById('chartBpm').getContext('2d');
+  charts.bpm = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{label:'BPM', data:buckets.bpm, backgroundColor:'#0052CC99', borderRadius:3, maxBarThickness:14}]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        y:{beginAtZero:true, grid:{color:'#EEF0F2'}},
+        x:{grid:{display:false}}
+      },
+      plugins:{legend:{display:false}}
+    }
+  });
+}
+
+function hourlyBuckets(recs){
+  const sysB = Array(24).fill(null).map(()=>[]);
+  const diaB = Array(24).fill(null).map(()=>[]);
+  const bpmB = Array(24).fill(null).map(()=>[]);
+  recs.forEach(r=>{ sysB[r.hour].push(r.sys); diaB[r.hour].push(r.dia); if(r.bpm!=null) bpmB[r.hour].push(r.bpm); });
+  return { sys: sysB.map(mean), dia: diaB.map(mean), bpm: bpmB.map(mean) };
+}
+
+const BLOCKS = [
+  {key:'manana', name:'Mañana', range:'06:00–12:00', from:6, to:12, icon:'sunrise', color:'#FFC107'},
+  {key:'mediodia', name:'Mediodía', range:'12:00–16:00', from:12, to:16, icon:'sun', color:'#0052CC'},
+  {key:'tarde', name:'Tarde', range:'16:00–20:00', from:16, to:20, icon:'sunset', color:'#FF8A3D'},
+  {key:'noche', name:'Noche', range:'20:00–06:00', from:20, to:6, icon:'moon', color:'#152238', wraps:true}
+];
+function inBlock(r, b){ return b.wraps ? (r.hour>=b.from || r.hour<b.to) : (r.hour>=b.from && r.hour<b.to); }
+
+function renderBlockTable(recs){
+  const tbody = document.querySelector('#blockTable tbody');
+  tbody.innerHTML = BLOCKS.map(b=>{
+    const rs = recs.filter(r=>inBlock(r,b));
+    if(!rs.length){
+      return `<tr><td><b>${b.name}</b> <small>(${b.range})</small></td><td colspan="7" style="color:var(--ink-faint);">Sin tomas</td></tr>`;
+    }
+    const sys = rs.map(r=>r.sys), dia = rs.map(r=>r.dia), bpm = rs.filter(r=>r.bpm!=null).map(r=>r.bpm);
+    const avgSys = mean(sys), avgDia = mean(dia);
+    const avgPam = mean(rs.map(r=>r.pam)), avgPp = mean(rs.map(r=>r.pp));
+    const cls = classifyBP(avgSys, avgDia);
+
+    return `<tr>
+      <td><b>${b.name}</b> <small style="color:var(--ink-faint);">${b.range}</small></td>
+      <td class="mono-cell">${Math.round(avgSys)}/${Math.round(avgDia)}</td>
+      <td class="mono-cell" style="color:var(--blue);">${Math.round(avgPam)}</td>
+      <td class="mono-cell" style="color:${avgPp>55?'var(--red)':'var(--ink)'};">${Math.round(avgPp)}</td>
+      <td class="mono-cell">${bpm.length?Math.round(mean(bpm)):'—'}</td>
+      <td class="mono-cell">${Math.round(Math.min(...sys))}/${Math.round(Math.min(...dia))}</td>
+      <td class="mono-cell">${Math.round(Math.max(...sys))}/${Math.round(Math.max(...dia))}</td>
+      <td><span class="status-dot" style="background:${cls.color};"></span><b style="color:${cls.color};">${cls.short}</b></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderLog(recs){
+  const tbody = document.getElementById('logBody');
+  const sorted = [...recs].sort((a,b)=>b.date-a.date);
+  document.getElementById('logCount').textContent = sorted.length;
+  tbody.innerHTML = sorted.map(r=>{
+    const alert = r.sys>=135 || r.dia>=85;
+    const cls = classifyBP(r.sys, r.dia);
+    return `<tr class="${alert?'row-alert':''}">
+      <td>${fmtDate(r.date)}</td>
+      <td class="mono-cell">${pad(r.hour)}:${pad(r.minute)}</td>
+      <td class="mono-cell ${r.sys>=135?'flag':''}">${Math.round(r.sys)}</td>
+      <td class="mono-cell ${r.dia>=85?'flag':''}">${Math.round(r.dia)}</td>
+      <td class="mono-cell" style="color:var(--blue);">${Math.round(r.pam)}</td>
+      <td class="mono-cell">${Math.round(r.pp)}</td>
+      <td class="mono-cell">${r.bpm==null?'—':Math.round(r.bpm)}</td>
+      <td><span class="cat-badge" style="background:${cls.color}22;color:${cls.color};">${cls.short}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function linreg(ys){
+  const n = ys.length;
+  if(n<2) return {slope:0, intercept: n?ys[0]:0};
+  let sumX=0,sumY=0,sumXY=0,sumXX=0;
+  for(let i=0;i<n;i++){ sumX+=i; sumY+=ys[i]; sumXY+=i*ys[i]; sumXX+=i*i; }
+  const denom = (n*sumXX - sumX*sumX) || 1;
+  const slope = (n*sumXY - sumX*sumY)/denom;
+  const intercept = (sumY - slope*sumX)/n;
+  return {slope, intercept};
+}
+
+function dailyMeans(recs){
+  const byDay = new Map();
+  recs.forEach(r=>{
+    const key = r.date.getFullYear()+'-'+pad(r.date.getMonth()+1)+'-'+pad(r.date.getDate());
+    if(!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(r);
+  });
+  const keys = [...byDay.keys()].sort();
+  return {
+    keys,
+    labels: keys.map(k=>{const [y,m,d]=k.split('-'); return d+'/'+m;}),
+    sys: keys.map(k=>mean(byDay.get(k).map(r=>r.sys))),
+    dia: keys.map(k=>mean(byDay.get(k).map(r=>r.dia)))
+  };
+}
+
+function buildEvolutionChart(recs){
+  destroyChart('evolution');
+  const days = dailyMeans(recs);
+  const badge = document.getElementById('trendBadge');
+  if(days.keys.length<2){
+    badge.innerHTML = '';
+    const ctx = document.getElementById('chartEvolution').getContext('2d');
+    charts.evolution = new Chart(ctx,{type:'line', data:{labels:days.labels, datasets:[
+      {label:'Sistólica', data:days.sys, borderColor:'#0052CC', backgroundColor:'#0052CC', pointRadius:4, borderWidth:2},
+      {label:'Diastólica', data:days.dia, borderColor:'#00A3A3', backgroundColor:'#00A3A3', pointRadius:4, borderWidth:2}
+    ]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}}});
+    return;
+  }
+  const reg = linreg(days.sys);
+  const slopePerWeek = reg.slope*7;
+  const trendLine = days.sys.map((_,i)=> reg.intercept + reg.slope*i);
+
+  let verdict;
+  if(Math.abs(slopePerWeek) < 1) verdict = {text:'Estable', icon:'→', color:'var(--ink-soft)', bg:'#EEF0F2'};
+  else if(slopePerWeek > 0) verdict = {text:'Al alza', icon:'↗', color:'var(--red)', bg:'var(--red-soft)'};
+  else verdict = {text:'A la baja', icon:'↘', color:'var(--green)', bg:'var(--green-soft)'};
+  badge.innerHTML = `<span class="trend-badge" style="background:${verdict.bg};color:${verdict.color};">${verdict.icon} Tendencia sistólica: ${verdict.text} (${slopePerWeek>=0?'+':''}${slopePerWeek.toFixed(1)} mmHg/semana)</span>`;
+
+  const ctx = document.getElementById('chartEvolution').getContext('2d');
+  charts.evolution = new Chart(ctx,{
+    type:'line',
+    data:{labels:days.labels, datasets:[
+      {label:'Sistólica', data:days.sys, borderColor:'#0052CC', backgroundColor:'rgba(0,82,204,.08)', fill:true, tension:.3, pointRadius:3, borderWidth:2},
+      {label:'Diastólica', data:days.dia, borderColor:'#00A3A3', backgroundColor:'rgba(0,163,163,.06)', fill:true, tension:.3, pointRadius:3, borderWidth:2},
+      {label:'Tendencia', data:trendLine, borderColor:'#8B93A1', borderDash:[6,4], pointRadius:0, borderWidth:2, fill:false}
+    ]},
+    options:{responsive:true, maintainAspectRatio:false,
+      scales:{y:{grid:{color:'#EEF0F2'}, ticks:{font:{size:10.5}}}, x:{grid:{display:false}, ticks:{font:{size:9.5}, maxTicksLimit:16}}},
+      plugins:{legend:{display:false}}}
+  });
+}
+
+function safe(fn, label){
+  try{ fn(); }catch(err){ console.error('Fallo al construir: '+label, err); }
+}
+
+function refresh(){
+  if(!RECORDS.length) return;
+  const recs = currentFilteredRecords();
+  document.getElementById('sumCount').textContent = recs.length;
+
+  let kpi = null;
+  safe(()=>{ kpi = computeKPIs(recs); buildKPICards(kpi); }, 'KPIs');
+  safe(()=> buildDistribution(recs), 'distribución');
+
+  if(typeof Chart !== 'undefined'){
+    safe(()=>{ const buckets = hourlyBuckets(recs); build24hChart(buckets); buildBpmChart(buckets); }, 'gráficos 24h');
+    safe(()=> buildEvolutionChart(recs), 'evolución');
+  } else {
+    console.error('Chart.js no se ha cargado. Compruebe la conexión a internet al abrir el archivo.');
+  }
+
+  safe(()=> renderBlockTable(recs), 'tabla de franjas');
+  safe(()=> renderLog(recs), 'historial');
+
+  if(recs.length){
+    const min = recs.reduce((a,b)=>a.date<b.date?a:b).date;
+    const max = recs.reduce((a,b)=>a.date>b.date?a:b).date;
+    document.getElementById('rangeText').textContent = `${fmtDate(min)} — ${fmtDate(max)}`;
+  }
+}
+
+function renderImportNotice(){
+  const el = document.getElementById('importNotice');
+  if(!IMPORT_STATS){ el.style.display='none'; return; }
+  const {total, ok, skippedNoDate, skippedNoValues} = IMPORT_STATS;
+  const skipped = skippedNoDate + skippedNoValues;
+  if(skipped<=0){ el.style.display='none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+  <span><b>${ok}</b> tomas importadas correctamente de <b>${total}</b> filas. Se han descartado <b>${skipped}</b>${skippedNoDate?` (${skippedNoDate} sin fecha reconocible)`:''}${skippedNoValues?`${skippedNoDate?' y':' ('}${skippedNoValues} sin sistólica/diastólica válidas)`:''}. Revise esas filas en el Excel original si esperaba más tomas.</span>`;
+}
+
+function onDataLoaded(){
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('report').classList.add('active');
+  document.getElementById('printBtn').style.display = '';
+  renderImportNotice();
+  populatePeriodPicker();
+  refresh();
+}
+
+document.getElementById('fileInput').addEventListener('change', (e)=>{ if(e.target.files[0]) loadWorkbook(e.target.files[0]); });
+document.getElementById('periodSeg').addEventListener('click',(e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#periodSeg button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  periodMode = btn.dataset.mode;
+  document.getElementById('customRange').style.display = periodMode==='custom' ? 'flex' : 'none';
+  populatePeriodPicker();
+  refresh();
+});
+document.getElementById('periodPick').addEventListener('change', refresh);
+document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+</script>
+</body>
+</html>
