@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Renombrador de Documentos</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 24px;
+      background: #f2f2f7;
+      color: #1c1c1e;
+      max-width: 650px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    }
+    h2 { margin-top: 0; font-size: 22px; }
+    p { font-size: 15px; color: #3a3a3c; line-height: 1.4; }
+    input[type="file"] {
+      display: block;
+      margin: 18px 0;
+      font-size: 15px;
+    }
+    button {
+      background: #007aff;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+    }
+    button:disabled {
+      background: #b0b0b5;
+    }
+    #status {
+      margin-top: 16px;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .success { color: #34c759; font-weight: 600; }
+    .warning { color: #ff9500; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Renombrador y Empaquetador ZIP</h2>
+  <p>Selecciona los 16 archivos PDF desde tu iPad. Se renombrarán automáticamente y se descargarán empaquetados en un archivo <strong>documentos_renombrados.zip</strong>.</p>
+  
+  <input type="file" id="pdfFiles" multiple accept=".pdf">
+  <button id="btnProcess" disabled onclick="procesarArchivos()">Renombrar y Descargar ZIP</button>
+  
+  <div id="status"></div>
+</div>
+
+<script>
+  const mapaNombres = {
+    "Scanned Document 16-10-2026 at 09.05.15_2.pdf": "2026-01-14_Maria_Salud_Nicolas_Presupuesto.pdf",
+    "Scanned Document 16-10-2026 at 09.01.33.pdf": "2026-03-24_Maria_Salud_Nicolas_Presupuesto.pdf",
+    "Scanned Document 16-10-2026 at 08.56.52.pdf": "2026-03-26_Jose_Luis_Nicolas_Presupuesto.pdf",
+    "Scanned Document 16-10-2026 at 09.04.25_2.pdf": "2026-03-26_Maria_Salud_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.10.49_2.pdf": "2026-04-06_Jose_Luis_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.09.53_2.pdf": "2026-04-21_Maria_Salud_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.07.19_2.pdf": "2026-05-12_Maria_Salud_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.08.15.pdf": "2026-05-18_Jose_Luis_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.09.07_2.pdf": "2026-05-28_Jose_Luis_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.11.46_2.pdf": "2026-06-15_Jose_Luis_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.12.33.pdf": "2026-06-16_Maria_Salud_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.15.51.pdf": "2026-07-21_Maria_Salud_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.14.34_2.pdf": "2026-09-02_Maria_Salud_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.16.28_2.pdf": "2026-09-07_Jose_Luis_Nicolas_Presupuesto.pdf",
+    "Scanned Document 16-10-2026 at 09.13.26_2.pdf": "2026-10-13_Maria_Salud_Nicolas.pdf",
+    "Scanned Document 16-10-2026 at 09.17.33.pdf": "2026-10-15_Jose_Luis_Nicolas.pdf"
+  };
+
+  const fileInput = document.getElementById('pdfFiles');
+  const btnProcess = document.getElementById('btnProcess');
+  const statusDiv = document.getElementById('status');
+
+  fileInput.addEventListener('change', () => {
+    btnProcess.disabled = fileInput.files.length === 0;
+  });
+
+  async function procesarArchivos() {
+    const files = fileInput.files;
+    if (files.length === 0) return;
+
+    btnProcess.disabled = true;
+    statusDiv.innerHTML = "Procesando documentos y comprimiendo...";
+    
+    const zip = new JSZip();
+    let procesados = 0;
+    let noCoincidentes = [];
+
+    for (let file of files) {
+      const nuevoNombre = mapaNombres[file.name] || file.name;
+      if (!mapaNombres[file.name]) {
+        noCoincidentes.push(file.name);
+      }
+      zip.file(nuevoNombre, file);
+      procesados++;
+    }
+
+    const contenidoZip = await zip.generateAsync({ type: "blob" });
+    
+    // Crear enlace de descarga automática
+    const enlace = document.createElement("a");
+    enlace.href = URL.createObjectURL(contenidoZip);
+    enlace.download = "documentos_renombrados.zip";
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+
+    let mensajeFinal = `<span class="success">✓ ¡Listo! Se ha generado el ZIP con ${procesados} archivos.</span>`;
+    if (noCoincidentes.length > 0) {
+      mensajeFinal += `<br><br><span class="warning">Aviso: Estos archivos no coincidían exactamente con los nombres de la lista y se mantuvieron igual:</span>\n- ` + noCoincidentes.join('\n- ');
+    }
+    statusDiv.innerHTML = mensajeFinal;
+    btnProcess.disabled = false;
+  }
+</script>
+
+</body>
+</html>
