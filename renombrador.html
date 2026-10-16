@@ -47,14 +47,14 @@
       white-space: pre-wrap;
     }
     .success { color: #34c759; font-weight: 600; }
-    .warning { color: #ff9500; }
+    .warning { color: #ff9500; font-weight: 600; }
   </style>
 </head>
 <body>
 
 <div class="card">
   <h2>Renombrador y Empaquetador ZIP</h2>
-  <p>Selecciona los 16 archivos PDF desde tu iPad. Se renombrarán automáticamente y se descargarán empaquetados en un archivo <strong>documentos_renombrados.zip</strong>.</p>
+  <p>Selecciona los 16 archivos PDF desde tu iPad. Se renombrarán automáticamente y se descargarán en <strong>documentos_renombrados.zip</strong>.</p>
   
   <input type="file" id="pdfFiles" multiple accept=".pdf">
   <button id="btnProcess" disabled onclick="procesarArchivos()">Renombrar y Descargar ZIP</button>
@@ -64,21 +64,62 @@
 
 <script>
   const mapaNombres = {
+    // 1. Presupuesto María Salud (14/01/2026)
+    "Scanned Document 16-10-2026 at 09.05.15.pdf": "2026-01-14_Maria_Salud_Nicolas_Presupuesto.pdf",
     "Scanned Document 16-10-2026 at 09.05.15_2.pdf": "2026-01-14_Maria_Salud_Nicolas_Presupuesto.pdf",
+
+    // 2. Presupuesto María Salud (24/03/2026)
     "Scanned Document 16-10-2026 at 09.01.33.pdf": "2026-03-24_Maria_Salud_Nicolas_Presupuesto.pdf",
+
+    // 3. Presupuesto José Luis (26/03/2026)
     "Scanned Document 16-10-2026 at 08.56.52.pdf": "2026-03-26_Jose_Luis_Nicolas_Presupuesto.pdf",
+
+    // 4. Factura María Salud (26/03/2026)
+    "Scanned Document 16-10-2026 at 09.04.25.pdf": "2026-03-26_Maria_Salud_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.04.25_2.pdf": "2026-03-26_Maria_Salud_Nicolas.pdf",
+
+    // 5. Factura José Luis (06/04/2026)
+    "Scanned Document 16-10-2026 at 09.10.49.pdf": "2026-04-06_Jose_Luis_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.10.49_2.pdf": "2026-04-06_Jose_Luis_Nicolas.pdf",
+
+    // 6. Factura María Salud (21/04/2026)
+    "Scanned Document 16-10-2026 at 09.09.53.pdf": "2026-04-21_Maria_Salud_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.09.53_2.pdf": "2026-04-21_Maria_Salud_Nicolas.pdf",
+
+    // 7. Factura María Salud (12/05/2026)
+    "Scanned Document 16-10-2026 at 09.07.19.pdf": "2026-05-12_Maria_Salud_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.07.19_2.pdf": "2026-05-12_Maria_Salud_Nicolas.pdf",
+
+    // 8. Factura José Luis (18/05/2026)
     "Scanned Document 16-10-2026 at 09.08.15.pdf": "2026-05-18_Jose_Luis_Nicolas.pdf",
+
+    // 9. Factura José Luis (28/05/2026)
+    "Scanned Document 16-10-2026 at 09.09.07.pdf": "2026-05-28_Jose_Luis_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.09.07_2.pdf": "2026-05-28_Jose_Luis_Nicolas.pdf",
+
+    // 10. Factura José Luis (15/06/2026)
+    "Scanned Document 16-10-2026 at 09.11.46.pdf": "2026-06-15_Jose_Luis_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.11.46_2.pdf": "2026-06-15_Jose_Luis_Nicolas.pdf",
+
+    // 11. Factura María Salud (16/06/2026)
     "Scanned Document 16-10-2026 at 09.12.33.pdf": "2026-06-16_Maria_Salud_Nicolas.pdf",
+
+    // 12. Factura María Salud (21/07/2026)
     "Scanned Document 16-10-2026 at 09.15.51.pdf": "2026-07-21_Maria_Salud_Nicolas.pdf",
+
+    // 13. Factura María Salud (02/09/2026)
+    "Scanned Document 16-10-2026 at 09.14.34.pdf": "2026-09-02_Maria_Salud_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.14.34_2.pdf": "2026-09-02_Maria_Salud_Nicolas.pdf",
+
+    // 14. Presupuesto José Luis (07/09/2026)
+    "Scanned Document 16-10-2026 at 09.16.28.pdf": "2026-09-07_Jose_Luis_Nicolas_Presupuesto.pdf",
     "Scanned Document 16-10-2026 at 09.16.28_2.pdf": "2026-09-07_Jose_Luis_Nicolas_Presupuesto.pdf",
+
+    // 15. Factura María Salud (13/10/2026)
+    "Scanned Document 16-10-2026 at 09.13.26.pdf": "2026-10-13_Maria_Salud_Nicolas.pdf",
     "Scanned Document 16-10-2026 at 09.13.26_2.pdf": "2026-10-13_Maria_Salud_Nicolas.pdf",
+
+    // 16. Factura José Luis (15/10/2026)
     "Scanned Document 16-10-2026 at 09.17.33.pdf": "2026-10-15_Jose_Luis_Nicolas.pdf"
   };
 
@@ -95,24 +136,24 @@
     if (files.length === 0) return;
 
     btnProcess.disabled = true;
-    statusDiv.innerHTML = "Procesando documentos y comprimiendo...";
+    statusDiv.innerHTML = "Comprimiendo y renombrando...";
     
     const zip = new JSZip();
-    let procesados = 0;
+    let renombrados = 0;
     let noCoincidentes = [];
 
     for (let file of files) {
-      const nuevoNombre = mapaNombres[file.name] || file.name;
-      if (!mapaNombres[file.name]) {
+      if (mapaNombres[file.name]) {
+        zip.file(mapaNombres[file.name], file);
+        renombrados++;
+      } else {
         noCoincidentes.push(file.name);
+        zip.file(file.name, file);
       }
-      zip.file(nuevoNombre, file);
-      procesados++;
     }
 
     const contenidoZip = await zip.generateAsync({ type: "blob" });
     
-    // Crear enlace de descarga automática
     const enlace = document.createElement("a");
     enlace.href = URL.createObjectURL(contenidoZip);
     enlace.download = "documentos_renombrados.zip";
@@ -120,9 +161,9 @@
     enlace.click();
     document.body.removeChild(enlace);
 
-    let mensajeFinal = `<span class="success">✓ ¡Listo! Se ha generado el ZIP con ${procesados} archivos.</span>`;
+    let mensajeFinal = `<span class="success">✓ Se han renombrado ${renombrados} de ${files.length} archivos correctamente.</span>`;
     if (noCoincidentes.length > 0) {
-      mensajeFinal += `<br><br><span class="warning">Aviso: Estos archivos no coincidían exactamente con los nombres de la lista y se mantuvieron igual:</span>\n- ` + noCoincidentes.join('\n- ');
+      mensajeFinal += `<br><br><span class="warning">Archivos que no coincidieron:</span>\n- ` + noCoincidentes.join('\n- ');
     }
     statusDiv.innerHTML = mensajeFinal;
     btnProcess.disabled = false;
